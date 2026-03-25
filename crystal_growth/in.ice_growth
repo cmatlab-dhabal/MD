@@ -1,0 +1,89 @@
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#                                                              +
+# TIP4P2005 WATER MODEL INPUT FILE LAMMPS                      +
+# Energy in Kcal/Mol, time in fs, distance in angstroms.       +
+#                                                              +
+#                        DEFINE VARIABLES                      +
+################################################################
+variable        P       equal   0.986923267     #atm
+variable        Ti      equal   200             #K
+variable        out     equal   100             #timestep
+variable        step    equal   2               #fs        
+variable        runtime equal   1000000           #step
+variable        dumptrj equal   ${runtime}/1000  #timestep
+variable        restart equal   ${runtime}/1    #timestep
+variable        seed    equal   432567          #unitless
+variable        Tdamp   equal   100             #timestep
+variable        Pdamp   equal   1000            #timestep
+
+#***************************************************************
+#               Defining atom, pair style
+#***************************************************************
+boundary        p p p
+units           real
+atom_style      full
+pair_style      lj/cut/tip4p/long 2 1 1 1 0.1546 10 8
+kspace_style    pppm/tip4p 1e-4
+bond_style      harmonic
+angle_style     harmonic
+dihedral_style  none
+improper_style  none
+
+read_data	half_melt.data
+
+mass            1  1.00800
+mass            2  15.9994
+group           oxygen type 2
+
+#***************************************************************
+# Define spatial regions (kept for reference, not used now)
+#***************************************************************
+region          lower block INF INF INF INF INF $(zhi/2) units box
+region          upper block INF INF INF INF $(zhi/2) INF units box
+
+group           ice region lower
+group           water region upper
+
+#***************************************************************
+#           Defining pair interaction potential
+#***************************************************************
+pair_coeff      2 2 0.1852 3.1589
+pair_coeff      * 1 0.0000 0.0000
+pair_modify     tail yes
+
+bond_coeff      1 00.00 0.9572
+angle_coeff     1 00.00 104.52
+
+neighbor        2.0 bin
+neigh_modify    every 1 delay 10 check yes
+
+#**************************************************************
+#                   Setting up the run
+#**************************************************************
+velocity       all create ${Ti} ${seed} dist uniform
+# constrain OH bonds and HOH angle (rigid water)
+fix             1 all shake 0.000001 20 0 b 1 a 1
+
+# NEW: Run whole system at low temperature (ice growth stage)
+#**************************************************************
+fix             2 all npt temp ${Ti} ${Ti} ${Tdamp} aniso ${P} ${P} ${Pdamp}
+
+# remove net linear momentum
+fix             4 all momentum 1 linear 1 1 1
+timestep        ${step}
+
+#***************************************************************
+#                Dumping the thermodynamic data
+#***************************************************************
+thermo          ${out}
+thermo_style    custom step temp pe etotal evdwl ecoul elong press enthalpy density
+thermo_modify   flush yes
+
+#*********************** Dump Trajectory ***********************
+dump            1 all custom ${dumptrj} dump.lammpstrj id type xs ys zs
+dump_modify     1 sort id
+run             ${runtime}
+
+#********************** Restart files **************************
+write_restart   restart_final.end
+write_data      final_conf.data

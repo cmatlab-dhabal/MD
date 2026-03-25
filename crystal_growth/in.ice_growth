@@ -6,7 +6,7 @@
 #                        DEFINE VARIABLES                      +
 ################################################################
 variable        P       equal   0.986923267     #atm
-variable        Ti      equal   200             #K
+variable        Ti      equal   248             #K
 variable        out     equal   100             #timestep
 variable        step    equal   2               #fs        
 variable        runtime equal   1000000           #step
